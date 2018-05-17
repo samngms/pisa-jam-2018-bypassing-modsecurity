@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+		<meta charset="utf-8">
+
+		<title>Bypassing ModeSecurity</title>
+
+		<meta name="description" content="Simple Reveal.js slidedeck template. Source files loaded from jsDelivr.">
+		<meta name="author" content="">
+
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/reveal.js/3.0.0/css/reveal.min.css">
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/reveal.js/3.0.0/css/theme/simple.css" id="theme">
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/reveal.js/3.0.0/css/theme/moon.css">
+
+		<!-- Printing and PDF exports -->
+		<script>
+			// Load print, pdf stylesheets from jsDelivr
+			var srcUrlPrefix = 'https://cdn.jsdelivr.net/reveal.js/3.0.0/';
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = srcUrlPrefix + (window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css');
+			document.getElementsByTagName( 'head' )[0].appendChild( link );
+		</script>
+
+		<!--[if lt IE 9]>
+		<script src="https://cdn.jsdelivr.net/reveal.js/3.0.0/lib/js/html5shiv.js"></script>
+		<![endif]-->
+	</head>
+
+	<body>
+
+		<div class="reveal">
+
+			<div class="slides">
+
+				<section>
+					<h1>Bypassing ModeSecurity</h1>
+					<p>by Sam Ng</p>
+				</section>
+
+				<section data-markdown>
+					## About me
+					- Have been working in ~~Fortify~~, ~~HP~~, ~~HPE~~, MicroFocus for 12 years
+					- Technical leader in Fortify Security Research Group, focus on Runtime Analysis (i.e. I write RASP Firewall rules)
+					- 17 patents (granted+pending) algorithms
+					</ul>
+				</section>
+				
+				<section data-markdown>
+					## ModSecurity
+					- By Ivan Ristic, initially an Apache module with a bunch of regex patterns
+					- An open source Web Application Firewall (WAF)
+					- Ivan now works in Qualys
+					
+					## libInjection
+					- By Nick Galbreath, initially only for detecting SQL Injection, now extended to support Cross-Site Scripting (XSS) as well
+					- The first time I heard about it was in Blackhat 2012, but only included by ModSecurity maybe 2-3 years ago
+					- Open source software
+					- Nick is now the founder of Signal Sciences
+				</section>				
+
+				<section>
+					<h2>libInjection</h2>
+					<ul>
+						<li>Does it look like a SQL <i>fragment</i>?</li>
+						<li>Three variants</li>
+						<ol>
+							<li>raw input: <code>0 or 1=1</code></li>
+							<li>single quoted: <code><font color="red">'</font>sam' or '1'='1<font color="red">'</font></code></li>
+							<li>double quoted: <code><font color="red">"</font>sam" or "1"="1<font color="red">"</font></code></li>
+						</ol>
+					</ul>
+				</section>	
+
+				<section data-markdown>
+					## Tokenization
+					`'1234' UNION USER_ID>0 --'`
+					
+					| input   | token        |
+					|---------|--------------|
+					|`'123'`  |string        |
+					|`UNION`  |union operator|
+					|`USER_ID`|name          |
+					|`>`      |operator      |
+					|`--`     |comment       |
+				</section>						
+
+				<section>
+					<h2>Token types</h2>
+					<table>
+						<tr>
+							<td width="50%">
+								<ul>
+									<li>string [s]</li>
+									<li>number [1]</li>
+									<li>comment [c]</li>
+									<li>name [n]</li>
+									<li>keyword [k]</li>
+									<li>function [f]</li>
+									<li>operator [o]</li>
+								</ul>
+							</td width="50%">
+							<td>
+								<ul>
+									<li>logical operator [&amp;]</li>
+									<li>group-like operation [g]</li>
+									<li>union-like operation [U]</li>
+									<li>comma [,]</li>
+									<li>semi-colon [;]</li>
+									<li>parenthesis [()]</li>
+									<li>unknown [?]</li>
+								</ul>
+							</td>
+						</tr>
+					</table>
+				</section>				
+				
+				<section data-markdown>
+					## Optimization
+					`'1234' UNION ALL SELECT 1234, 1234, 1234, 1234, 1234, 1234, 1234, 1234, 1234 AND 'xyz' = 'xyz'`
+					
+					- Become: `sUk1,1,1,1,1,1,1,1,1&amp;sos`
+					- Become: `sUk1&amp;s`
+					- Max 5 tokens: `sUk1&amp;`
+					- There are around 500 known injection fingerprints
+				</section>						
+				
+				<section data-markdown>
+					## Demo
+					- Bypass ModSecurity/libInjection on 4 major database vendors
+					  1. MySQL
+					  2. PostgreSQL
+					  3. MS SQL
+					  4. Oracle
+					- The attacks are based on two root causes
+					  1. libInjection can't recognize the code construct
+					  2. It's an unknown fingerprint
+				</section>			
+				
+				<section data-markdown>
+					## PostgreSQL
+					- $$ quote
+					- `SELECT * FROM table WHERE name = $$sam$$`
+					- `SELECT * FROM table WHERE name = $hello$sam$hello$`
+				</section>					
+				
+				<section data-markdown>
+					## MS-SQL
+					- `SELECT * FROM table1 WHERE age > $10`
+					- Except $, many other currency symbols are supported
+					- ¢, £, ¤, ¥, ৲, ৳, ฿, ៛, ₠, ₡, ₢, ₣, ₤, ₥, ₦, ₧, ₨, ₩, ₪, ₫
+					- €, ₭, ₮, ₯, ₰, ₱, ﷼, ﹩, ＄, ￠, ￡, ￥, ￦
+				</section>					
+				
+				<section data-markdown>
+					## Oracle
+					- q quote
+					- `SELECT * FROM table WHERE name = q'!ab'cd!'`
+					- `SELECT * FROM table WHERE name = q'(ab'cd)'`
+					- {}, [], () are paired, （ still ends with （
+					- 1.0d means 1.0 decimal, 1.0f means 1.0 float
+					- `select * from table1 where age > 1d`
+					- Oracle always consume the 'd' or 'f' if available
+				</section>		
+				
+				<section data-markdown>
+					## Line comment
+					`SELECT * FROM table WHERE -- foobar [ch] name = 'sam'` 
+					
+					| Server | Result   |
+					|--------|----------|
+					| MySQL  | \n       |
+					| PgSQL  | \r or \n |
+					| MsSQL  | \r or \n |
+					| Oracle | \n       |
+				</section>	
+
+				<section data-markdown>
+					## Lesson Learn
+					
+					- I won't say libInjection is bad, in fact, libInjection is much better than regex patterns
+					- Detecting SQL Injection is *HARD*
+					- That means detecting XSS with injection point inside a `script` tag or `OnClick` attribute is equally difficult					
+				</section>					
+				
+				<section data-markdown>
+					## Related research
+					
+					- LangSec suggests using full parser (usually implemented by parser combinator) to parse the input data. LangSec recommends people to use a parser with exactly the same behavior as the backend parser. Prevoty, a RASP provider, maybe doing this.
+					- RASP allows us to capture not only the HTTP side inputs, but also the full query string. My research in Fortify is in this area.
+					- Some researchers implemented a dynamic taint on PHP with 5-10% performance degradation. I implemented dynamic taint on Java, but the performance overhead was 300%, .NET was even worse.
+					- You can also enable Bayesian analysis on ModSecurity. 
+				</section>											
+				
+			</div><!-- .slides -->
+
+		</div><!-- .reveal -->
+
+		<script src="https://cdn.jsdelivr.net/reveal.js/3.0.0/lib/js/head.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/reveal.js/3.0.0/js/reveal.min.js"></script>
+
+		<script>
+			// Full list of configuration options available at:
+			// https://github.com/hakimel/reveal.js#configuration
+			Reveal.initialize({
+				controls: true,
+				progress: true,
+				history: true,
+				center: true,
+				width: '80%',
+
+				transition: 'convex', // none/fade/slide/convex/concave/zoom
+
+				// Optional reveal.js plugins, loaded from jsDelivr
+				dependencies: [
+					{ src: srcUrlPrefix + 'lib/js/classList.js', condition: function() { return !document.body.classList; } },
+					{ src: srcUrlPrefix + 'plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+					{ src: srcUrlPrefix + 'plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+					{ src: srcUrlPrefix + 'plugin/highlight/highlight.js', async: true, condition: function() { return !!document.querySelector( 'pre code' ); }, callback: function() { hljs.initHighlightingOnLoad(); } },
+					{ src: srcUrlPrefix + 'plugin/zoom-js/zoom.js', async: true },
+					{ src: srcUrlPrefix + 'plugin/notes/notes.js', async: true }
+				]
+			});
+
+		</script>
+
+	</body>
+</html>
