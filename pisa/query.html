@@ -1,0 +1,66 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('#submit').click(function () {
+                var type = $('input[name=type]:checked').val()
+                var query = $('#query').val()
+                var sql = ('name' == type) ? `SELECT * FROM employee WHERE name = '${query}'` : `SELECT * FROM employee WHERE age = ${query}`
+                $('#sql').text(sql);
+                $('#result').text('[Working...]');
+                $.ajax({
+                    url: 'api/query', 
+                    dataType: 'json',
+                    type: 'post',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        query: query,
+                        type: type,
+                        db: $('#db').val()
+                    }),
+                    success: function (data, textStatus, jqxhr) {
+                        var s = ''
+                        if (data.length == 0) {
+                            s = '[no data]'
+                        } else {
+                            for (var i = 0; i < data.length; i++) {
+                                s += JSON.stringify(data[i]) + '<br/>'
+                            }         
+                        }
+                        $('#result').html(s)
+                    },
+                    error: function (jqxhr, textStatus, errorThrown) {
+                        $('#result').html(jqxhr.status + " " + jqxhr.statusText)
+                    }
+                })
+            });
+        });
+    </script>
+    <style>
+        body {
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <form>
+        Query: <input id="query" type="text" size="30" /><br/>
+        <input id="type1" type="radio" name="type" value="name" checked/><label for="type1">Name</label> <input id="type2" type="radio" name="type" value="age"/><label for="type2">Age</label><br/>
+        <select id="db">
+            <option value="mysql" selected>MySQL</option>
+            <option value="pgsql">PgSQL</option>
+            <option value="sqlserver">SQL Server</option>
+            <option value="oracle">Oracle</option>
+        </select><br/>
+        <input id="submit" type="button" value="Submit"/>
+    </form>
+    <br/>
+    <div id="sql"></div>
+    <br/>
+    <div id="result"></div>
+</body>
+</html>
