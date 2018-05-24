@@ -197,7 +197,51 @@
 					- RASP allows us to capture not only the HTTP side inputs, but also the full query string. My research in Fortify is in this area.
 					- Some researchers implemented a dynamic taint on PHP with 5-10% performance degradation. I implemented dynamic taint on Java, but the performance overhead was 300%, .NET was even worse.
 					- You can also enable Bayesian analysis on ModSecurity. 
-				</section>											
+				</section>			
+
+				<section>
+					<h2>Summary</h2>
+					
+					<table>
+						<tr>
+							<td>MySQL</td>
+							<td>PgSQL</td>
+						</tr>
+						<tr>
+							<td nowrap>
+								<code>
+								0 or true<br/>
+								0 or age > 0<br/>
+								0 or age != name<br/>
+								a' or age > 0 #<br/>
+								a' or 3>.1e(2) #</code>
+							</td>
+							<td nowrap>
+								<code>
+								0 or \|/ 25 > 1<br/>
+								a' or $x$a'b$x$ != 'y</code>
+							</td>
+						</tr>
+						<tr>
+							<td>MSSQL</td>
+							<td>Oracle</td>
+						</tr>
+						<tr>
+							<td nowrap>
+								<code>
+								0 or 2 < > 1<br/>
+								a' or 2 < > 1 --<br/>
+								a' or€2 > 0 --</code>
+							</td>
+							<td nowrap>
+								<code>
+								0 or 2^=1<br/>
+								x' or q'（d)' ab cd ef（' != 'x<br/>
+								x' + 1dor 2>'1</code>
+							</td>
+						</tr>						
+					</table>
+				</section>						
 				
 			</div><!-- .slides -->
 
